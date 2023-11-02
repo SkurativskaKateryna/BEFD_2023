@@ -1,0 +1,36 @@
+---
+title: "Time-Series Analysis for Renewable Energies Data"
+author: "Skurativska Kateryna, Zolghadr Sharare"
+date: "2023-10-24"
+output:
+  html_document:
+    toc: true
+    number_sections: true
+  pdf_document:
+    toc: true
+    number_sections: true
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Introduction
+
+Here will be intro information
+
+# Project
+
+Here what we plan to do
+
+## Data
+
+A little bit about our amazing data
+
+## Model
+
+Maybe here we will forecast smth
+
+# Conclusions
+
+And finally our results
