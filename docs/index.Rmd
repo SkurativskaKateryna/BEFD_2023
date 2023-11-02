@@ -17,20 +17,26 @@ knitr::opts_chunk$set(echo = TRUE)
 
 # Introduction
 
-Here will be intro information
+Our aim is to analyze energy consumption, especially renewable energies and how it changes over the years. We limit our analysis only for EU-area, as it has more information about renewable energies than any other area. Our plan is to try to answer on the following questions:
 
-# Project
+1.  Renewable Energy Adoption and Growth
+    1.  How does it evolve over time?
+    2.  Can we forecast the future growth in a specific region?
+    3.  What factors influence the growth?
+    4.  What are seasonal and annual trends in renewable energy production and how do they impact energy supply and demand?
+2.   Electricity price forecasting
+    1.  Can we predict electricity prices based on the availability of renewable energy sources?
+    2.  How does integration impact price volatility?
+3.  Carbon emission reduction
+    1.  How does growth of renewable energy sources contribute to a reduction in carbon
+    2.  Can we estimate the potential impact of future renewable energy adoption on future carbon emissions?
 
-Here what we plan to do
+The analysis will be made general for the EU and for each country separately.
 
-## Data
+Data we need:
 
-A little bit about our amazing data
+1.  Energy consumption for each country annually and monthly for each type of energy production
 
-## Model
+2.  Electricity prices for each country during the same period
 
-Maybe here we will forecast smth
-
-# Conclusions
-
-And finally our results
+3.  CO2 emisions for each country
