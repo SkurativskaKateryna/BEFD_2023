@@ -24,9 +24,7 @@ Our aim is to analyze energy consumption, especially renewable energies and how 
     2.  Can we forecast the future growth in a specific region?
     3.  What factors influence the growth?
     4.  What are seasonal and annual trends in renewable energy production and how do they impact energy supply and demand?
-2.   Electricity price forecasting
-    1.  Can we predict electricity prices based on the availability of renewable energy sources?
-    2.  How does integration impact price volatility?
+2.  Electricity price forecasting 1. Can we predict electricity prices based on the availability of renewable energy sources? 2. How does integration impact price volatility?
 3.  Carbon emission reduction
     1.  How does growth of renewable energy sources contribute to a reduction in carbon
     2.  Can we estimate the potential impact of future renewable energy adoption on future carbon emissions?
