@@ -37,4 +37,314 @@ Data we need:
 
 2.  Electricity prices for each country during the same period
 
-3.  CO2 emisions for each country
+CO2 emisions for each country
+
+```{r}
+library(ggplot2)
+library(readxl)
+library(lmtest) 
+library(forecast)
+library(DIMORA)
+library(fpp2)
+library(BASS)
+library(corrplot)
+
+```
+
+## Annual data analysis
+
+Let's read annual data
+
+```{r}
+data_ann <- read.csv("DATA BEFD/yearly_full_release_long_format.csv")
+
+head(data_ann)
+
+
+```
+
+```{r}
+
+data_eu <- subset(data_ann, EU == 1)
+head(data_eu)
+unique_countries_eu <- unique(data_eu$Area)
+paste("List of countries:", paste(unique_countries_eu, collapse = ", "))
+
+unique_years_eu <- unique(data_eu$Year)
+paste("From ", paste(min(data_eu$Year)), " until ", paste(max(data_eu$Year)))
+
+```
+
+We decided to limit our analysis to 27 countries in EU: Austria, Belgium, Bulgaria, Croatia, Republic of Cyprus, Czech Republic, Denmark, Estonia, Finland, France, Germany, Greece, Hungary, Ireland, Italy, Latvia, Lithuania, Luxembourg, Malta, Netherlands, Poland, Portugal, Romania, Slovakia, Slovenia, Spain and Sweden during the period from 2000 until 2022 years.
+
+### Comparison between countries
+
+Now let's plot demand, but in this case for each country from EU.
+
+```{r}
+# Load ggplot2
+library(ggplot2)
+
+yellow_to_seagreen <- colorRampPalette(c("yellow", "seagreen"))
+i<-0
+
+# Generate a vector of colors from the palette
+num_colors <- length(unique(data_eu$Area))  # Adjust the number of colors as needed
+color_vector <- yellow_to_seagreen(num_colors)
+
+# Initialize an empty ggplot object
+combined_plot <- ggplot() +
+  labs(title = "Time Series plot for electricity Demand", x = "Year", y = "Demand(TWh)")
+
+# Initialize a vector to store the country names for legend
+legend_labels <- c()
+
+# Loop over unique countries
+for (country in unique(data_eu$Area)) {
+  i <- i+1
+  # Subset data for the current country and demand variable
+  subset_data <- subset(data_eu, Area == country & Variable == "Demand")
+  
+  #print(country)
+  # Add line for the current country to the combined plot
+  combined_plot <- combined_plot +
+    geom_line(data = subset_data, aes(x = Year, y = Value, fill = Area), linetype = "solid", size = 0.25, color = color_vector[i]) +
+    geom_point(data = subset_data, aes(x = Year, y = Value,  fill = Area), size = 1, color = color_vector[i])
+  
+  # Add the country to the legend labels vector
+  legend_labels <- c(legend_labels, country)
+}
+
+# Add manual legend
+combined_plot <- combined_plot +
+  scale_color_identity(
+    guide = guide_legend(title = "Country"),
+    labels = legend_labels
+  )
+
+# Display the combined plot
+print(combined_plot)
+
+```
+
+From the plot we can see that behavior of electricity demand is a bit similar for each country.
+
+```{r}
+# Load the dplyr package
+library(dplyr)
+
+
+# Group by Country and Variable and calculate mean, median, and standard deviation
+summary_stats <- subset(data_eu, Variable == "Demand") %>%
+  group_by(Area) %>%
+  summarize(
+    Mean = mean(Value),
+    Median = median(Value),
+    StandardDeviation = sd(Value),
+    IQR = IQR(Value)
+  )
+
+# Print the summary statistics
+print(summary_stats)
+
+```
+
+Let's check correlation coefficients between different countries:
+
+```{r}
+# Sample vector
+countries <- unique(data_eu$Area)
+total_demand <- data.frame(Year = unique(data_eu$Year))
+# Loop with enumerate-like functionality
+for (i in seq_along(countries) ){
+  country <- countries[i]
+  country_demand <- subset(data_eu, Area == country & Variable == "Demand")$Value
+  total_demand[country] <- country_demand
+  #print(paste("Country:", country, "demand", length(country_demand)))
+}
+head(total_demand)
+
+cor_matrix <- cor(total_demand[, -1])
+#print(cor_matrix)
+
+corrplot(cor_matrix)
+```
+
+### Example analysis of one country(Austria)
+
+Before doing analysis for each country let's chose one of them and make analysis for it. For instance lets take only demand electricity for Austria and make some visualization.
+
+```{r}
+data_Austria <- subset(data_eu, Area == "Austria")
+head(data_Austria)
+
+demand_energy_Austria <- subset(data_Austria, Variable == "Demand")
+head(demand_energy_Austria)
+
+ggplot(demand_energy_Austria, aes(x = Year, y = Value)) +
+  geom_point(color="seagreen") +
+  geom_line(color = "seagreen", linetype = "solid", size = 0.5)+
+  labs(title = "Time Series plot for electricity Demand Austria", x = "Year", y = "Demand(TWh)")
+```
+
+#### Linear regression for an example
+
+##### Simple Linear Regression
+
+Let's apply linear regression for this time series data.
+
+```{r}
+# Fit a linear regression model
+model_slr <- lm(Value ~ Year, data = demand_energy_Austria)
+
+# Display the summary of the linear regression model
+summary(model_slr)
+
+# Visualize the data with the regression line
+ggplot(demand_energy_Austria, aes(x = Year, y = Value)) +
+  geom_line(color = "seagreen", size = 0.25) +
+  geom_smooth(method = "lm", se = FALSE, color = "#D0E513", size = 0.5) +
+  labs(title = "Time Series Plot with Linear Regression Line", x = "Year", y = "Value")
+
+
+```
+
+In summary, from the linear regression model we can say that there are statistically significant relationship between 'Year' and 'Value', and the linera regression model explains a substantial amount of the variability in 'Value'. We can also see that both coefficients Intercept and Year are quite important, as their p-value is very small. R-squared is 0.8394 which means that approximately 83.94% of the variability in 'Value' is explained by 'Year'. F-statistics is 109.8 and p-value is 8.499e-10 indicate that the overall model is statistically significant.
+
+```{r}
+tt<- 1:NROW(demand_energy_Austria)
+
+# Fit a linear regression model
+model_slr_tt <- lm(Value ~ tt, data = demand_energy_Austria)
+
+# Display the summary of the linear regression model
+summary(model_slr_tt)
+
+# Visualize the data with the regression line
+ggplot(demand_energy_Austria, aes(x = tt, y = Value)) +
+  geom_line(color = "seagreen", size = 0.25) +
+  geom_smooth(method = "lm", se = FALSE, color = "#D0E513", size = 0.5) +
+  labs(title = "Time Series Plot with Linear Regression Line", x = "Year", y = "Value")
+```
+
+##### Residual analysis
+
+```{r}
+ggAcf(demand_energy_Austria$Year, demand_energy_Austria$Value, color = "seagreen") +
+  geom_line(color = "seagreen", size = 0.25) 
+
+  
+```
+
+```{r}
+# Example data
+set.seed(42)
+df <- data.frame(x = 1:10, y = rnorm(10), group = rep(c("A", "B"), each = 5))
+
+# Create a plot with custom line colors and linetypes
+ggplot(df, aes(x, y, color = group, linetype = group)) +
+  geom_line() +
+  scale_color_manual(values = c("A" = "orange", "B" = "blue")) +
+  scale_linetype_manual(values = c("A" = "dashed", "B" = "solid"))
+
+
+```
+
+```{r}
+
+##check the residuals? are they autocorrelated? Test of DW
+dwtest(model_slr)
+
+# Assuming 'model_slr' is your linear regression model
+res_model_slr <- residuals(model_slr)
+
+# Create a data frame for ggplot
+residual_df <- data.frame(Time = 1:length(res_model_slr), Residuals = res_model_slr)
+
+# Create a residual plot with ggplot
+ggplot(residual_df, aes(x = Time, y = Residuals)) +
+  geom_point(color = "seagreen", size = 1.5) +
+  geom_line(color = "seagreen", size = 0.5)+
+  geom_hline(yintercept = 0, linetype = "dashed", color = "#FC7E08", size = 1.0) +
+  labs(title = "Residual Plot", x = "Time", y = "Residuals")
+  
+
+```
+
+The test statistic for Durbin-Watson is less than 2, indicating the possibility of positive autocorrelation. p-value is very small, suggesting that the autocorrelation is significantly different from zero.
+
+Based on the Durbin-Watson test, there is evidence to suggest that there is positive autocorrelation in the residuals for simple linear regression model. This means that the residuals are not independent, and there is some systematic pattern or correlation between them.
+
+Also plot doesn't show confident independence between measures. It has more "parabolic" form and therefore we cannot conclude that model fit the data.
+
+##### Time-Series Linear Regression
+
+From previous step we concluded that simple linear regression doesn't fir data, therefore let's try time-series linear regression.
+
+```{r}
+##let us do the same with a linear model for time series, so we transform the data into a 'ts' object
+model_tslr <- ts(demand_energy_Austria$Value, frequency = 1)
+plot(model_tslr, type="o")
+
+## we fit a linear model with the tslm function
+fitts<- tslm(model_tslr~trend)
+
+###obviously it gives the same results of the first model
+summary(fitts)
+
+dwtest(fitts)
+```
+
+##### Bass Model
+
+```{r}
+# Fit the Bass model
+bass_model <- BASS.fit(demand_energy_Austria$Value, time = demand_energy_Austria$Year)
+
+# Display the fitted Bass model parameters
+summary(bass_model)
+
+# Predict the adoption using the fitted Bass model
+adoption_predictions <- predict(bass_model, newdata = data.frame(Time = your_data$Time))
+
+# Plot the adoption curve
+plot(your_data$Time, your_data$Adoption, type = "l", col = "blue", lwd = 2, xlab = "Time", ylab = "Adoption")
+lines(your_data$Time, adoption_predictions$Predicted, col = "red", lty = 2, lwd = 2)
+legend("topleft", legend = c("Observed", "Predicted"), col = c("blue", "red"), lty = c(1, 2), lwd = 2)
+```
+
+\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\--
+
+\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\--
+
+Below is colours we can use. They are pretty nice 🟡🟢
+
+```{r}
+
+#this is very beutifull palett for our plots(yellow and seagreen)
+
+# Create a color palette from yellow to seagreen
+yellow_to_seagreen <- colorRampPalette(c("yellow", "seagreen"))
+
+# Generate a vector of colors from the palette
+num_colors <- 10  # Adjust the number of colors as needed
+color_vector <- yellow_to_seagreen(num_colors)
+
+# Display the colors
+print(color_vector)
+
+# Plot a gradient using the colors
+library(ggplot2)
+
+gradient_df <- data.frame(
+  x = 1:num_colors,
+  y = rep(1, num_colors)
+)
+
+ggplot(gradient_df, aes(x = x, y = y, fill = factor(x))) +
+  geom_tile(color = "white") +
+  scale_fill_manual(values = color_vector) +
+  theme_void() +
+  labs(title = "Yellow to Seagreen Gradient")
+
+```
