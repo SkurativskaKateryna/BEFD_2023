@@ -49,6 +49,7 @@ library(fpp2)
 library(BASS)
 library(corrplot)
 
+
 ```
 
 ## Annual data analysis
@@ -81,6 +82,49 @@ We decided to limit our analysis to 27 countries in EU: Austria, Belgium, Bulgar
 
 Now let's plot demand, but in this case for each country from EU.
 
+Basic statistics for each country
+
+```{r}
+# Load the dplyr package
+library(dplyr)
+
+
+# Group by Country and Variable and calculate mean, median, and standard deviation
+summary_stats <- subset(data_eu, Variable == "Demand") %>%
+  group_by(Area) %>%
+  summarize(
+    Mean = mean(Value),
+    Median = median(Value),
+    StandardDeviation = sd(Value),
+    IQR = IQR(Value)
+  )
+
+# Print the summary statistics
+print(summary_stats)
+```
+
+Correlation coefficients:
+
+```{r}
+library(corrplot)
+# Sample vector
+countries <- unique(data_eu$Area)
+total_demand <- data.frame(Year = unique(data_eu$Year))
+# Loop with enumerate-like functionality
+for (i in seq_along(countries) ){
+  country <- countries[i]
+  country_demand <- subset(data_eu, Area == country & Variable == "Demand")$Value
+  total_demand[country] <- country_demand
+  #print(paste("Country:", country, "demand", length(country_demand)))
+}
+head(total_demand)
+
+cor_matrix <- cor(total_demand[, -1])
+#print(cor_matrix)
+
+corrplot(cor_matrix)
+```
+
 ```{r}
 # Load ggplot2
 library(ggplot2)
@@ -108,8 +152,8 @@ for (country in unique(data_eu$Area)) {
   #print(country)
   # Add line for the current country to the combined plot
   combined_plot <- combined_plot +
-    geom_line(data = subset_data, aes(x = Year, y = Value, fill = Area), linetype = "solid", size = 0.25, color = color_vector[i]) +
-    geom_point(data = subset_data, aes(x = Year, y = Value,  fill = Area), size = 1, color = color_vector[i])
+    geom_line(data = subset_data, aes(x = Year, y = Value), linetype = "solid", size = 0.25) +
+    geom_point(data = subset_data, aes(x = Year, y = Value), size = 1)
   
   # Add the country to the legend labels vector
   legend_labels <- c(legend_labels, country)
@@ -127,47 +171,1004 @@ print(combined_plot)
 
 ```
 
-From the plot we can see that behavior of electricity demand is a bit similar for each country.
-
 ```{r}
-# Load the dplyr package
-library(dplyr)
+# Load ggplot2 package
+library(ggplot2)
 
+# Assuming 'df' is your data frame
+# Assuming 'Area' is the country column, 'Year' is the year column, and 'Value' is the value column
+subset_data <- subset(data_eu, Variable == "Demand")
 
-# Group by Country and Variable and calculate mean, median, and standard deviation
-summary_stats <- subset(data_eu, Variable == "Demand") %>%
-  group_by(Area) %>%
-  summarize(
-    Mean = mean(Value),
-    Median = median(Value),
-    StandardDeviation = sd(Value),
-    IQR = IQR(Value)
-  )
-
-# Print the summary statistics
-print(summary_stats)
+# Create a line plot using ggplot2
+ggplot(subset_data, aes(x = Year, y = Value, color = Area, group = Area)) +
+  geom_line() +
+  labs(title = "Values Over Time for Different Countries",
+       x = "Year",
+       y = "Value",
+       color = "Country") +
+  theme_minimal()
 
 ```
 
-Let's check correlation coefficients between different countries:
+```{r}
+# Install and load necessary packages
+#install.packages("plotly")
+library(plotly)
+
+# Assuming 'df' is your data frame
+# Assuming 'Area' is the country column, 'Year' is the year column, and 'Value' is the value column
+
+# Create an interactive line plot with plotly
+plot_ly(subset_data, x = ~Year, y = ~Value, color = ~Area, type = "scatter", mode = "lines", line = list(width = 2)) %>%
+  layout(title = "Values Over Time for Different Countries",
+         xaxis = list(title = "Year"),
+         yaxis = list(title = "Value"),
+         showlegend = TRUE)
+
+```
+
+let's do the clustrization
 
 ```{r}
-# Sample vector
-countries <- unique(data_eu$Area)
-total_demand <- data.frame(Year = unique(data_eu$Year))
-# Loop with enumerate-like functionality
-for (i in seq_along(countries) ){
-  country <- countries[i]
-  country_demand <- subset(data_eu, Area == country & Variable == "Demand")$Value
-  total_demand[country] <- country_demand
-  #print(paste("Country:", country, "demand", length(country_demand)))
+# Assuming 'subset_dataset' is your data frame with 'Area', 'Value', and 'Year' columns
+
+# Extract the 'Value' column for clustering
+data_for_clustering <- subset_data$Value
+
+# Set the number of clusters (adjust as needed)
+num_clusters <- 4
+
+# Perform k-means clustering
+kmeans_result <- kmeans(data_for_clustering, centers = num_clusters)
+
+# Add the cluster labels to your original data frame
+subset_data$Cluster <- as.factor(kmeans_result$cluster)
+
+# Print the cluster centers
+print(kmeans_result$centers)
+
+# Visualize the clusters
+# library(ggplot2)
+# ggplot(subset_data, aes(x = Year, y = Value, color = Cluster)) +
+#   geom_point() +
+#   labs(title = "Countries Clustered Based on Value",
+#        x = "Year",
+#        y = "Value",
+#        color = "Cluster") +
+#   theme_minimal()
+
+
+plot_ly(subset_data, x = ~Year, y = ~Value, color = ~Cluster, type = "scatter", mode = "markers") %>%
+  layout(title = "Countries Clustered Based on Value",
+         xaxis = list(title = "Year"),
+         yaxis = list(title = "Value"),
+         showlegend = TRUE)
+
+```
+
+Next step is to use mean of each cluster for further analysis:
+
+```{r}
+# Assuming 'subset_dataset' is your data frame with 'Area', 'Value', 'Year', and 'Cluster' columns
+
+# Group by Cluster and Year, then calculate the mean
+cluster_means <- subset_data %>%
+  group_by(Cluster, Year) %>%
+  summarise(Value = mean(Value))
+
+# Print the resulting data frame
+print(cluster_means)
+
+library(plotly)
+
+plot_ly(cluster_means, x = ~Year, y = ~Value, color = ~Cluster, type = "scatter", mode = "lines") %>%
+  layout(title = "Cluster Means Over Time",
+         xaxis = list(title = "Year"),
+         yaxis = list(title = "Mean Value"),
+         showlegend = TRUE)
+
+```
+
+## Forecasting for clusters
+
+## Autocorrelation for clusters
+
+The code below is for fancy plotting, not imposrtant
+
+```{r}
+# Install and load necessary packages
+# install.packages("plotly")
+library(plotly)
+
+# Assuming 'ts_data' is your time series data
+ts_data <- c(2.3, 3.4, 1.5, 2.7, 3.2, 2.8, 1.9, 3.1, 2.5, 3.6)
+
+# Calculate autocorrelation manually
+acf_values <- acf(ts_data, plot = FALSE)
+
+print(acf_values$acf[1:10,1,1])
+print(acf_values$lag[1:10,1,1])
+
+fig <- plot_ly(
+  x = acf_values$lag[1:10,1,1],
+  y = acf_values$acf[1:10,1,1],
+  type = "bar"
+)
+fig
+
+# # Create a bar chart for autocorrelation using plotly
+# acf_plot <- plot_ly(x = 0:length(acf_values) - 1, y = acf_values, type = "bar", name = "Autocorrelation") %>%
+#   layout(title = "Autocorrelation Function (ACF)", xaxis = list(title = "Lag"))
+# 
+# # Show the plot
+# acf_plot
+
+```
+
+Let's built autocorrelation for each cluster
+
+```{r}
+# Assuming 'cluster_means' is your data frame with 'Cluster', 'Year', and 'Value' columns
+
+# Get unique clusters
+clusters <- unique(cluster_means$Cluster)
+
+# Set up a 2x2 layout
+par(mfrow = c(2, 2), mar = c(4, 4, 2, 1))
+
+# Loop through clusters
+for (c in clusters) {
+  t <- subset(cluster_means, Cluster == c)
+  ts_data <- ts(t$Value)
+
+  # Plot autocorrelation
+  acf(ts_data, main = paste("Autocorrelation for Cluster", c))
+
+  # Plot time series
+  plot(ts_data, main = paste("Time Series for Cluster", c), xlab = "Year", ylab = "Demand")
 }
-head(total_demand)
 
-cor_matrix <- cor(total_demand[, -1])
-#print(cor_matrix)
+# Reset the plot layout to default
+par(mfrow = c(1, 1), mar = c(5, 4, 4, 2) + 0.1)
 
-corrplot(cor_matrix)
+
+
+```
+
+From plots above: no seasonality and probably trend is descending .
+
+## Simple forecasting
+
+```{r}
+library(forecast)
+  ccc <- subset(cluster_means, Cluster==1)
+  cc <- ts(ccc$Value)
+  autoplot(cc) +
+  autolayer(meanf(cc, h=10),
+    series="Mean", PI=FALSE) +
+  autolayer(rwf(cc, h=10),
+    series="Random walk", PI=FALSE) +
+  autolayer(rwf(cc, drift=TRUE, h=10),
+    series="Drift", PI=FALSE) +
+  autolayer(naive(cc, h=10),
+    series="Naive", PI=FALSE) +
+  ggtitle("Cluster 1") +
+  xlab("Year") + ylab("Demand") +
+  guides(colour=guide_legend(title="Forecast"))
+
+ccc <- subset(cluster_means, Cluster==2)
+  cc <- ts(ccc$Value)
+  autoplot(cc) +
+  autolayer(meanf(cc, h=10),
+    series="Mean", PI=FALSE) +
+  autolayer(rwf(cc, h=10),
+    series="Random walk", PI=FALSE) +
+  autolayer(rwf(cc, drift=TRUE, h=10),
+    series="Drift", PI=FALSE) +
+  autolayer(naive(cc, h=10),
+    series="Naive", PI=FALSE) +
+  ggtitle("Cluster 2") +
+  xlab("Year") + ylab("Demand") +
+  guides(colour=guide_legend(title="Forecast"))
+  
+ccc <- subset(cluster_means, Cluster==3)
+  cc <- ts(ccc$Value)
+  autoplot(cc) +
+  autolayer(meanf(cc, h=10),
+    series="Mean", PI=FALSE) +
+  autolayer(rwf(cc, h=10),
+    series="Random walk", PI=FALSE) +
+  autolayer(rwf(cc, drift=TRUE, h=10),
+    series="Drift", PI=FALSE) +
+  autolayer(naive(cc, h=10),
+    series="Naive", PI=FALSE) +
+  ggtitle("Cluster 3") +
+  xlab("Year") + ylab("Demand") +
+  guides(colour=guide_legend(title="Forecast"))
+  
+ccc <- subset(cluster_means, Cluster==4)
+  cc <- ts(ccc$Value)
+  autoplot(cc) +
+  autolayer(meanf(cc, h=10),
+    series="Mean", PI=FALSE) +
+  autolayer(rwf(cc, h=10),
+    series="Random walk", PI=FALSE) +
+  autolayer(rwf(cc, drift=TRUE, h=10),
+    series="Drift", PI=FALSE) +
+  autolayer(naive(cc, h=10),
+    series="Naive", PI=FALSE) +
+  ggtitle("Cluster 4") +
+  xlab("Year") + ylab("Demand") +
+  guides(colour=guide_legend(title="Forecast"))
+
+```
+
+### Residual diagnostics
+
+```{r}
+library(forecast)
+library(ggplot2)
+#cc <- subset(cluster_means, Cluster==1)
+# autoplot(ts(cc$Value)) +
+#   xlab("Year") + ylab("Demand") +
+#   ggtitle("Demand")
+# 
+# res <- residuals(naive(ts(cc$Value)))
+# autoplot(res) + xlab("Year") + ylab("") +
+#   ggtitle("Residuals from naïve method")
+print("------------Cluster 1---------------")
+cc <- subset(cluster_means, Cluster==1)
+checkresiduals(meanf(ts(cc$Value)))
+checkresiduals(rwf(ts(cc$Value)))
+checkresiduals(rwf(ts(cc$Value), drift=TRUE))
+checkresiduals(naive(ts(cc$Value)))
+
+print("------------Cluster 2---------------")
+cc <- subset(cluster_means, Cluster==2)
+checkresiduals(meanf(ts(cc$Value)))
+checkresiduals(rwf(ts(cc$Value)))
+checkresiduals(rwf(ts(cc$Value), drift=TRUE))
+checkresiduals(naive(ts(cc$Value)))
+
+print("------------Cluster 3---------------")
+cc <- subset(cluster_means, Cluster==3)
+checkresiduals(meanf(ts(cc$Value)))
+checkresiduals(rwf(ts(cc$Value)))
+checkresiduals(rwf(ts(cc$Value), drift=TRUE))
+checkresiduals(naive(ts(cc$Value)))
+
+print("------------Cluster 4---------------")
+cc <- subset(cluster_means, Cluster==4)
+checkresiduals(meanf(ts(cc$Value)))
+checkresiduals(rwf(ts(cc$Value)))
+checkresiduals(rwf(ts(cc$Value), drift=TRUE))
+checkresiduals(naive(ts(cc$Value)))
+
+
+```
+
+The Ljung-Box test indicates that there are no significant autocorrelation in the residuals for any of this model.
+
+## Evaluating Forecast accuracy
+
+```{r}
+cl1 <- ts(subset(cluster_means, Cluster==1)$Value, start=2000, frequency=1)
+
+train_cl1 <- window(cl1,start=2000,end=2017)
+cl1fit1 <- meanf(train_cl1,h=5)
+cl1fit2 <- rwf(train_cl1,h=5)
+cl1fit3 <- rwf(train_cl1, drift=TRUE, h=5)
+#cl1fit4 <- naive(train_cl1, h=5)
+#cl1fit5 <- snaive(train_cl1, h=5)
+autoplot(window(cl1, start=2000)) +
+  autolayer(cl1fit1, series="Mean", PI=FALSE) +
+  autolayer(cl1fit2, series="Random walk", PI=FALSE) +
+  autolayer(cl1fit3, series="Random walk with drift", PI=FALSE) +
+  #autolayer(cl1fit4, series="Naive", PI=FALSE) +
+  #autolayer(cl1fit5, series="Seasonal Naive", PI=FALSE) +
+  xlab("Year") + ylab("Demand") +
+  ggtitle("Forecasts for electricity demand Cluster 1") +
+  guides(colour=guide_legend(title="Forecast"))
+
+print("Forecast accuracy for Cluster 1")
+test_cl1 <- window(cl1,start=2018)
+print("Mean model")
+accuracy(cl1fit1, test_cl1)
+print("Random walk model")
+accuracy(cl1fit2, test_cl1)
+print("Random walk with drift model")
+accuracy(cl1fit3, test_cl1)
+print("---------------------------------------------------")
+
+
+
+cl1 <- ts(subset(cluster_means, Cluster==2)$Value, start=2000, frequency=1)
+
+train_cl1 <- window(cl1,start=2000,end=2017)
+cl1fit1 <- meanf(train_cl1,h=5)
+cl1fit2 <- rwf(train_cl1,h=5)
+cl1fit3 <- rwf(train_cl1, drift=TRUE, h=5)
+#cl1fit4 <- naive(train_cl1, h=5)
+#cl1fit5 <- snaive(train_cl1, h=5)
+autoplot(window(cl1, start=2000)) +
+  autolayer(cl1fit1, series="Mean", PI=FALSE) +
+  autolayer(cl1fit2, series="Random walk", PI=FALSE) +
+  autolayer(cl1fit3, series="Random walk with drift", PI=FALSE) +
+  #autolayer(cl1fit4, series="Naive", PI=FALSE) +
+  #autolayer(cl1fit5, series="Seasonal Naive", PI=FALSE) +
+  xlab("Year") + ylab("Demand") +
+  ggtitle("Forecasts for electricity demand Cluster 2") +
+  guides(colour=guide_legend(title="Forecast"))
+
+print("Forecast accuracy for Cluster 2")
+test_cl1 <- window(cl1,start=2018)
+print("Mean model")
+accuracy(cl1fit1, test_cl1)
+print("Random walk model")
+accuracy(cl1fit2, test_cl1)
+print("Random walk with drift model")
+accuracy(cl1fit3, test_cl1)
+print("---------------------------------------------------")
+
+cl1 <- ts(subset(cluster_means, Cluster==3)$Value, start=2000, frequency=1)
+
+train_cl1 <- window(cl1,start=2000,end=2017)
+cl1fit1 <- meanf(train_cl1,h=5)
+cl1fit2 <- rwf(train_cl1,h=5)
+cl1fit3 <- rwf(train_cl1, drift=TRUE, h=5)
+#cl1fit4 <- naive(train_cl1, h=5)
+#cl1fit5 <- snaive(train_cl1, h=5)
+autoplot(window(cl1, start=2000)) +
+  autolayer(cl1fit1, series="Mean", PI=FALSE) +
+  autolayer(cl1fit2, series="Random walk", PI=FALSE) +
+  autolayer(cl1fit3, series="Random walk with drift", PI=FALSE) +
+  #autolayer(cl1fit4, series="Naive", PI=FALSE) +
+  #autolayer(cl1fit5, series="Seasonal Naive", PI=FALSE) +
+  xlab("Year") + ylab("Demand") +
+  ggtitle("Forecasts for electricity demand Cluster 3") +
+  guides(colour=guide_legend(title="Forecast"))
+
+print("Forecast accuracy for Cluster 3")
+test_cl1 <- window(cl1,start=2018)
+print("Mean model")
+accuracy(cl1fit1, test_cl1)
+print("Random walk model")
+accuracy(cl1fit2, test_cl1)
+print("Random walk with drift model")
+accuracy(cl1fit3, test_cl1)
+print("---------------------------------------------------")
+
+cl1 <- ts(subset(cluster_means, Cluster==4)$Value, start=2000, frequency=1)
+
+train_cl1 <- window(cl1,start=2000,end=2017)
+cl1fit1 <- meanf(train_cl1,h=5)
+cl1fit2 <- rwf(train_cl1,h=5)
+cl1fit3 <- rwf(train_cl1, drift=TRUE, h=5)
+#cl1fit4 <- naive(train_cl1, h=5)
+#cl1fit5 <- snaive(train_cl1, h=5)
+autoplot(window(cl1, start=2000)) +
+  autolayer(cl1fit1, series="Mean", PI=FALSE) +
+  autolayer(cl1fit2, series="Random walk", PI=FALSE) +
+  autolayer(cl1fit3, series="Random walk with drift", PI=FALSE) +
+  #autolayer(cl1fit4, series="Naive", PI=FALSE) +
+  #autolayer(cl1fit5, series="Seasonal Naive", PI=FALSE) +
+  xlab("Year") + ylab("Demand") +
+  ggtitle("Forecasts for electricity demand Cluster 4") +
+  guides(colour=guide_legend(title="Forecast"))
+
+print("Forecast accuracy for Cluster 4")
+test_cl1 <- window(cl1,start=2018)
+print("Mean model")
+accuracy(cl1fit1, test_cl1)
+print("Random walk model")
+accuracy(cl1fit2, test_cl1)
+print("Random walk with drift model")
+accuracy(cl1fit3, test_cl1)
+print("---------------------------------------------------")
+```
+
+Now let's compute forecast accuracy for those models:
+
+```{r}
+test_cl1 <- window(cl1,start=2018)
+accuracy(cl1fit1, test_cl1)
+accuracy(cl1fit2, test_cl1)
+accuracy(cl1fit3, test_cl1)
+#accuracy(cl1fit4, test_cl1) #Naive and random walk are the same
+```
+
+Random walk with drift seems to have a slightly lower RMSE, MAE, MAPE, and ACF1 compared to others, suggesting better performance.
+
+### Time-series Cross Validation
+
+```{r}
+cl <- ts(subset(cluster_means, Cluster==1)$Value, start=2000, frequency=1)
+
+print("CLuster 1")
+e <- tsCV(cl, rwf, drift=TRUE, h=1)
+sqrt(mean(e^2, na.rm=TRUE))
+sqrt(mean(residuals(rwf(cl, drift=TRUE))^2, na.rm=TRUE))
+
+e <- tsCV(cl, meanf, h=1)
+sqrt(mean(e^2, na.rm=TRUE))
+sqrt(mean(residuals(meanf(cl))^2, na.rm=TRUE))
+
+e <- tsCV(cl, rwf, h=1)
+sqrt(mean(e^2, na.rm=TRUE))
+sqrt(mean(residuals(rwf(cl))^2, na.rm=TRUE))
+print("----------------------------------------")
+
+cl <- ts(subset(cluster_means, Cluster==2)$Value, start=2000, frequency=1)
+
+print("CLuster 2")
+e <- tsCV(cl, rwf, drift=TRUE, h=1)
+sqrt(mean(e^2, na.rm=TRUE))
+sqrt(mean(residuals(rwf(cl, drift=TRUE))^2, na.rm=TRUE))
+
+e <- tsCV(cl, meanf, h=1)
+sqrt(mean(e^2, na.rm=TRUE))
+sqrt(mean(residuals(meanf(cl))^2, na.rm=TRUE))
+
+e <- tsCV(cl, rwf, h=1)
+sqrt(mean(e^2, na.rm=TRUE))
+sqrt(mean(residuals(rwf(cl))^2, na.rm=TRUE))
+print("----------------------------------------")
+
+cl <- ts(subset(cluster_means, Cluster==3)$Value, start=2000, frequency=1)
+
+print("CLuster 3")
+e <- tsCV(cl, rwf, drift=TRUE, h=1)
+sqrt(mean(e^2, na.rm=TRUE))
+sqrt(mean(residuals(rwf(cl, drift=TRUE))^2, na.rm=TRUE))
+
+e <- tsCV(cl, meanf, h=1)
+sqrt(mean(e^2, na.rm=TRUE))
+sqrt(mean(residuals(meanf(cl))^2, na.rm=TRUE))
+
+e <- tsCV(cl, rwf, h=1)
+sqrt(mean(e^2, na.rm=TRUE))
+sqrt(mean(residuals(rwf(cl))^2, na.rm=TRUE))
+print("----------------------------------------")
+
+cl <- ts(subset(cluster_means, Cluster==4)$Value, start=2000, frequency=1)
+
+print("CLuster 4")
+e <- tsCV(cl, rwf, drift=TRUE, h=1)
+sqrt(mean(e^2, na.rm=TRUE))
+sqrt(mean(residuals(rwf(cl, drift=TRUE))^2, na.rm=TRUE))
+
+e <- tsCV(cl, meanf, h=1)
+sqrt(mean(e^2, na.rm=TRUE))
+sqrt(mean(residuals(meanf(cl))^2, na.rm=TRUE))
+
+e <- tsCV(cl, rwf, h=1)
+sqrt(mean(e^2, na.rm=TRUE))
+sqrt(mean(residuals(rwf(cl))^2, na.rm=TRUE))
+print("----------------------------------------")
+```
+
+```{r}
+num_val <- 21
+cl <- ts(subset(cluster_means, Cluster==1)$Value, start=2000, frequency=1)
+
+e <- tsCV(cl, forecastfunction=rwf, h=num_val)
+# Compute the MSE values and remove missing values
+mse <- colMeans(e^2, na.rm = T)
+# Plot the MSE values against the forecast horizon
+data.frame(h = 1:num_val, MSE = mse) %>%
+  ggplot(aes(x = h, y = MSE)) + geom_point() +
+  ggtitle("MSE for Cluster 1 random walk Model")
+
+e <- tsCV(cl, forecastfunction=rwf,drift=TRUE, h=num_val)
+# Compute the MSE values and remove missing values
+mse <- colMeans(e^2, na.rm = T)
+# Plot the MSE values against the forecast horizon
+data.frame(h = 1:num_val, MSE = mse) %>%
+  ggplot(aes(x = h, y = MSE)) + geom_point()+
+  ggtitle("MSE for Cluster 1 random walk with drift Model")
+
+e <- tsCV(cl, forecastfunction=meanf, h=num_val)
+# Compute the MSE values and remove missing values
+mse <- colMeans(e^2, na.rm = T)
+# Plot the MSE values against the forecast horizon
+data.frame(h = 1:num_val, MSE = mse) %>%
+  ggplot(aes(x = h, y = MSE)) + geom_point()+
+  ggtitle("MSE for Cluster 1 average Model")
+
+```
+
+###  
+
+```{r}
+cl <- ts(subset(cluster_means, Cluster==2)$Value, start=2000, frequency=1)
+
+e <- tsCV(cl, forecastfunction=rwf, h=num_val)
+# Compute the MSE values and remove missing values
+mse <- colMeans(e^2, na.rm = T)
+# Plot the MSE values against the forecast horizon
+data.frame(h = 1:num_val, MSE = mse) %>%
+  ggplot(aes(x = h, y = MSE)) + geom_point() +
+  ggtitle("MSE for Cluster 2 random walk Model")
+
+e <- tsCV(cl, forecastfunction=rwf,drift=TRUE, h=num_val)
+# Compute the MSE values and remove missing values
+mse <- colMeans(e^2, na.rm = T)
+# Plot the MSE values against the forecast horizon
+data.frame(h = 1:num_val, MSE = mse) %>%
+  ggplot(aes(x = h, y = MSE)) + geom_point()+
+  ggtitle("MSE for Cluster 2 random walk with drift Model")
+
+e <- tsCV(cl, forecastfunction=meanf, h=num_val)
+# Compute the MSE values and remove missing values
+mse <- colMeans(e^2, na.rm = T)
+# Plot the MSE values against the forecast horizon
+data.frame(h = 1:num_val, MSE = mse) %>%
+  ggplot(aes(x = h, y = MSE)) + geom_point()+
+  ggtitle("MSE for Cluster 2 average Model")
+
+
+cl <- ts(subset(cluster_means, Cluster==3)$Value, start=2000, frequency=1)
+
+e <- tsCV(cl, forecastfunction=rwf, h=num_val)
+# Compute the MSE values and remove missing values
+mse <- colMeans(e^2, na.rm = T)
+# Plot the MSE values against the forecast horizon
+data.frame(h = 1:num_val, MSE = mse) %>%
+  ggplot(aes(x = h, y = MSE)) + geom_point() +
+  ggtitle("MSE for Cluster 3 random walk Model")
+
+e <- tsCV(cl, forecastfunction=rwf,drift=TRUE, h=num_val)
+# Compute the MSE values and remove missing values
+mse <- colMeans(e^2, na.rm = T)
+# Plot the MSE values against the forecast horizon
+data.frame(h = 1:num_val, MSE = mse) %>%
+  ggplot(aes(x = h, y = MSE)) + geom_point()+
+  ggtitle("MSE for Cluster 3 random walk with drift Model")
+
+e <- tsCV(cl, forecastfunction=meanf, h=num_val)
+# Compute the MSE values and remove missing values
+mse <- colMeans(e^2, na.rm = T)
+# Plot the MSE values against the forecast horizon
+data.frame(h = 1:num_val, MSE = mse) %>%
+  ggplot(aes(x = h, y = MSE)) + geom_point()+
+  ggtitle("MSE for Cluster 3 average Model")
+
+
+cl <- ts(subset(cluster_means, Cluster==4)$Value, start=2000, frequency=1)
+
+e <- tsCV(cl, forecastfunction=rwf, h=num_val)
+# Compute the MSE values and remove missing values
+mse <- colMeans(e^2, na.rm = T)
+# Plot the MSE values against the forecast horizon
+data.frame(h = 1:num_val, MSE = mse) %>%
+  ggplot(aes(x = h, y = MSE)) + geom_point() +
+  ggtitle("MSE for Cluster 4 random walk Model")
+
+e <- tsCV(cl, forecastfunction=rwf,drift=TRUE, h=num_val)
+# Compute the MSE values and remove missing values
+mse <- colMeans(e^2, na.rm = T)
+# Plot the MSE values against the forecast horizon
+data.frame(h = 1:num_val, MSE = mse) %>%
+  ggplot(aes(x = h, y = MSE)) + geom_point()+
+  ggtitle("MSE for Cluster 4 random walk with drift Model")
+
+e <- tsCV(cl, forecastfunction=meanf, h=num_val)
+# Compute the MSE values and remove missing values
+mse <- colMeans(e^2, na.rm = T)
+# Plot the MSE values against the forecast horizon
+data.frame(h = 1:num_val, MSE = mse) %>%
+  ggplot(aes(x = h, y = MSE)) + geom_point()+
+  ggtitle("MSE for Cluster 4 average Model")
+```
+
+### Prediction intervals
+
+```{r}
+cl <- ts(subset(cluster_means, Cluster==1)$Value, start=2000, frequency=1)
+autoplot(rwf(cl, bootstrap = TRUE))
+autoplot(rwf(cl, drift=TRUE, bootstrap = TRUE))
+autoplot(meanf(cl, bootstrap = TRUE))
+```
+
+## CO2 emissions
+
+```{r}
+library(plotly)
+data_co2 <- subset(data_eu, Variable == "Total emissions")
+  
+plot_ly(data_co2, x = ~Year, y = ~Value, color = ~Area, type = "scatter", mode = "lines", line = list(width = 2)) %>%
+  layout(title = "Values Over Time for Different Countries",
+         xaxis = list(title = "Year"),
+         yaxis = list(title = "Value"),
+         showlegend = TRUE)
+
+```
+
+We do the same clasterization as for demand variable
+
+```{r}
+library(dplyr)
+
+subset_data_co2 <- data.frame(data_co2$Area,data_co2$Year, data_co2$Value)
+colnames(subset_data_co2) <- c("Cluster", "Year", "Value")
+
+#cp <- unique(subset_data_co2$Area)
+#print(cp)
+
+subset_data_co2[subset_data_co2 == "Italy" |subset_data_co2 == "Spain"] <- 1
+subset_data_co2[subset_data_co2 == "France" |subset_data_co2 == "Germany"] <- 2
+subset_data_co2[subset_data_co2 == "Belgium" | subset_data_co2 == "Finland" | 
+                  subset_data_co2 == "Netherlands" | subset_data_co2 == "Poland" | 
+                  subset_data_co2 == "Sweden"] <- 3
+#countries_to_keep <- "Austria Belgium Bulgaria Croatia Cyprus Czechia Denmark Estonia Finland France Germany Greece Hungary Ireland Italy Latvia Lithuania Luxembourg Malta Netherlands Poland Portugal Romania Slovakia Slovenia Spain Sweden"
+for (c in cp){
+  subset_data_co2[(subset_data_co2 == c)] <- 4
+}
+
+```
+
+```{r}
+# Extract the 'Value' column for clustering
+data_for_clustering <- data_co2$Value
+
+# Set the number of clusters (adjust as needed)
+num_clusters <- 4
+
+
+
+# Perform k-means clustering
+kmeans_result <- kmeans(data_for_clustering, centers = num_clusters)
+
+# Add the cluster labels to your original data frame
+data_co2$Cluster <- as.factor(kmeans_result$cluster)
+
+# Print the cluster centers
+print(kmeans_result$centers)
+
+# Visualize the clusters
+# library(ggplot2)
+# ggplot(subset_data, aes(x = Year, y = Value, color = Cluster)) +
+#   geom_point() +
+#   labs(title = "Countries Clustered Based on Value",
+#        x = "Year",
+#        y = "Value",
+#        color = "Cluster") +
+#   theme_minimal()
+
+
+plot_ly(subset_data, x = ~Year, y = ~Value, color = ~Cluster, type = "scatter", mode = "markers") %>%
+  layout(title = "Countries Clustered Based on Value",
+         xaxis = list(title = "Year"),
+         yaxis = list(title = "Value"),
+         showlegend = TRUE)
+
+
+```
+
+```{r}
+# Assuming 'subset_dataset' is your data frame with 'Area', 'Value', 'Year', and 'Cluster' columns
+
+# Group by Cluster and Year, then calculate the mean
+cluster_means_co2 <- subset_data_co2 %>%
+  group_by(Cluster, Year) %>%
+  summarise(Value = mean(Value))
+
+# Print the resulting data frame
+print(cluster_means_co2)
+
+library(plotly)
+
+plot_ly(cluster_means_co2, x = ~Year, y = ~Value, color = ~Cluster, type = "scatter", mode = "lines") %>%
+  layout(title = "Cluster Means Over Time",
+         xaxis = list(title = "Year"),
+         yaxis = list(title = "Mean Value"),
+         showlegend = TRUE)
+```
+
+## Time-Series Regression Models
+
+```{r}
+#Cluster 1
+
+library(xts)
+
+
+x <- ts(subset(cluster_means, Cluster == 1)$Value , start=2000, frequency = 1)
+y <- ts(subset(cluster_means_co2, Cluster == 1)$Value, start=2000, frequency = 1)
+
+d <- 
+
+autoplot(x, facets=TRUE) +
+  xlab("Year: 2014") + ylab("") +
+  ggtitle("Demand Cluster 1")
+
+autoplot(y, facets=TRUE) +
+  xlab("Year: 2014") + ylab("") +
+  ggtitle("CO2 emission Cluster 1")
+
+
+as.data.frame(d) |>
+  ggplot(aes(x=x, y=y)) +
+  geom_point() +
+  ylab("Demand (GW)") + xlab("Temperature (Celsius)")
+
+
+```
+
+### Average and Simple LR method forecasting
+
+Below we ran sinple linear regression without splitting for train and test sets.
+
+```{r}
+rmse_results <- data.frame(matrix(nrow = 0, ncol = 3))
+colnames(rmse_results) <- c("Cluster", "Average", "LR")
+
+print("Cluster 1")
+subset_means <- subset(cluster_means, Cluster == 1)
+  
+lm_model <- lm(Value ~ Year, data = subset_means)
+  
+# Print the linear regression models
+#print(lm_model)
+lm_predictions1 <- predict(lm_model, newdata = subset_means)
+subset_means$LRForecast <- lm_predictions1
+subset_means$AverageForecast <- df_with_forecasts$AverageForecast[df_with_forecasts$Cluster==1]
+
+#print(lm_predictions1)
+
+rmse_lm <- sqrt(mean((subset_means$Value - subset_means$LRForecast)^2))
+
+rmse_avg <- sqrt(mean((subset_means$Value - subset_means$AverageForecast)^2))
+
+rmse_results <- rbind(rmse_results, data.frame(Cluster = 1, Average=rmse_avg, LR=rmse_lm))
+
+#----------------------------------------------
+
+print("Cluster 2")
+subset_means <- subset(cluster_means, Cluster == 2)
+  
+lm_model <- lm(Value ~ Year, data = subset_means)
+  
+# Print the linear regression models
+#print(lm_model)
+lm_predictions2 <- predict(lm_model, newdata = subset_means)
+#print(lm_predictions2)
+subset_means$LRForecast <- lm_predictions2
+subset_means$AverageForecast <- df_with_forecasts$AverageForecast[df_with_forecasts$Cluster==2]
+
+#print(lm_predictions1)
+
+rmse_lm <- sqrt(mean((subset_means$Value - subset_means$LRForecast)^2))
+
+rmse_avg <- sqrt(mean((subset_means$Value - subset_means$AverageForecast)^2))
+
+rmse_results <- rbind(rmse_results, data.frame(Cluster = 2, Average=rmse_avg, LR=rmse_lm))
+
+#----------------------------------------------
+print("Cluster 3")
+subset_means <- subset(cluster_means, Cluster == 3)
+  
+lm_model <- lm(Value ~ Year, data = subset_means)
+
+  
+# Print the linear regression models
+#print(lm_model)
+lm_predictions3 <- predict(lm_model, newdata = subset_means)
+#print(lm_predictions3)
+subset_means$LRForecast <- lm_predictions3
+subset_means$AverageForecast <- df_with_forecasts$AverageForecast[df_with_forecasts$Cluster==3]
+
+#print(lm_predictions1)
+
+rmse_lm <- sqrt(mean((subset_means$Value - subset_means$LRForecast)^2))
+
+rmse_avg <- sqrt(mean((subset_means$Value - subset_means$AverageForecast)^2))
+
+rmse_results <- rbind(rmse_results, data.frame(Cluster = 3, Average=rmse_avg, LR=rmse_lm))
+#----------------------------------------------
+
+print("Cluster 4")
+subset_means <- subset(cluster_means, Cluster == 4)
+  
+lm_model <- lm(Value ~ Year, data = subset_means)
+  
+# Print the linear regression models
+#print(lm_model)
+lm_predictions4 <- predict(lm_model, newdata = subset_means)
+#print(lm_predictions4)
+subset_means$LRForecast <- lm_predictions4
+subset_means$AverageForecast <- df_with_forecasts$AverageForecast[df_with_forecasts$Cluster==4]
+
+#print(lm_predictions1)
+
+rmse_lm <- sqrt(mean((subset_means$Value - subset_means$LRForecast)^2))
+
+rmse_avg <- sqrt(mean((subset_means$Value - subset_means$AverageForecast)^2))
+
+rmse_results <- rbind(rmse_results, data.frame(Cluster = 4, Average=rmse_avg, LR=rmse_lm))
+#----------------------------------------------
+l <- c(lm_predictions1,lm_predictions2, lm_predictions3, lm_predictions4)
+df_with_forecasts$LRForecast <- l
+```
+
+Before we checked simple linear regression and average method. We applied and calculated rmse for each cluster.
+
+### Average and simple LR forecasting with train/test split
+
+Let's try do the same but with train and test split:
+
+```{r}
+library(zoo)
+
+#rmse_results_split <- data.frame(matrix(nrow = 0, ncol = 4))
+#rsq_results_split <- data.frame(matrix(nrow = 0, ncol = 4))
+#colnames(rmse_results_split) <- c("Cluster", "Train_or_Test", "Average", "LR")
+#colnames(rsq_results_split) <- c("Cluster", "Train_or_Test", "Average", "LR")
+
+train_all <- data.frame()
+test_all <- data.frame()
+
+for ( c in clusters){
+  print(paste("Cluster", c))
+  
+  subset_cluster <- subset(cluster_means, Cluster == c)
+  
+  #print(subset_cluster_mean)
+  
+  #train and test split 
+  
+  split_point <- 2018
+  
+  train_data <- subset(subset_cluster, Year < split_point)
+  test_data <- subset(subset_cluster, Year >= split_point)
+  
+  #Average method
+  train_data$Average <- mean(train_data$Value)
+  test_data$Average <- mean(train_data$Value)
+  
+  #rmse_avg_train <- sqrt(mean((train_data$Value - train_data$Average)^2))
+  #rmse_avg_test <- sqrt(mean((test_data$Value - test_data$Average)^2))
+  
+  #rsq_train_avg <- 1 - sum((train_data$Value - train_data$Average)^2) / sum((train_data$Value - mean(train_data$Value))^2)
+  #rsq_test_avg <- 1 - sum((test_data$Value - test_data$Average)^2) / sum((test_data$Value - mean(test_data$Value))^2)
+  
+  #simple LR method
+  lm_model <- lm(Value ~ Year, data = train_data)
+  
+  train_data$LR <- predict(lm_model, newdata = train_data)
+  test_data$LR <- predict(lm_model, newdata = test_data)
+  
+  #rmse_lm_train <- sqrt(mean((train_data$Value - train_data$LR)^2))
+  #rmse_lm_test <- sqrt(mean((test_data$Value - test_data$LR)^2))
+  
+  #rmse_results_split <- rbind(rmse_results_split, data.frame(Cluster = c, Train_or_Test="Train", Average=rmse_avg_train, LR=rmse_lm_train))
+  #rmse_results_split <- rbind(rmse_results_split, data.frame(Cluster = c, Train_or_Test="Test", Average=rmse_avg_test, LR=rmse_lm_test))
+  
+  #rsq_train_lm <- summary(lm_model)$r.squared
+  #rsq_test_lm <- 1 - sum((test_data$Value - test_data$LR)^2) / sum((test_data$Value - mean(test_data$Value))^2)
+  
+  #rsq_results_split <- rbind(rsq_results_split, data.frame(Cluster = c, Train_or_Test="Train", Average=rsq_train_avg, LR=rsq_train_lm))
+  #rsq_results_split <- rbind(rsq_results_split, data.frame(Cluster = c, Train_or_Test="Test", Average=rsq_test_avg, LR=rsq_test_lm))
+  train_all <- rbind(train_all, train_data)
+  test_all <- rbind(test_all, test_data)
+}
+
+
+```
+
+And after let's see what our metrics are:
+
+```{r}
+library(Metrics)
+
+metric_out <- function(cluster, train_observed, trained_predicted, test_observed, test_predicted){
+  
+  
+  metrics_results <- data.frame(matrix(nrow = 0, ncol = 6))
+  colnames(metrics_results) <- c("Cluster", "Train_or_Test", "MSE", "RMSE", "MAE", "R_2")
+
+  mse_train <- mse(train_observed, trained_predicted)
+  rmse_train <- rmse(train_observed, trained_predicted)
+  mae_train <- mae(train_observed, trained_predicted)
+  r2_train <- cor(train_observed, trained_predicted)^2
+
+  mse_test <- mse(test_observed, test_predicted)
+  rmse_test <- rmse(test_observed, test_predicted)
+  mae_test <- mae(test_observed, test_predicted)
+  r2_test <- cor(test_observed, test_predicted)^2
+
+  #print("Train")
+  #print(paste(mse_train, rmse_train, mae_train, r2_train))
+  
+  #print("Test")
+  #print(paste(mse_test, rmse_test, mae_test, r2_test))
+
+  metrics_results <- rbind(metrics_results, data.frame(Cluster = cluster, Train_or_Test="Train", MSE=mse_train, RMSE=rmse_train, MAE=mae_train, R_2=r2_train))
+  metrics_results <- rbind(metrics_results, data.frame(Cluster = cluster, Train_or_Test="Test", MSE=mse_test, RMSE=rmse_test, MAE=mae_test, R_2=r2_test))
+  
+  return(metrics_results)
+}
+
+#print(metric_out(cluster=4, train_data$Value, train_data$LR, test_data$Value, test_data$LR))
+```
+
+```{r}
+library(dplyr)
+
+metrics_all <- data.frame() 
+
+metric_out_all_clusters <- function(train_all, test_all){
+  clusters <- unique(train_all$Cluster) 
+  
+  for ( c in clusters){
+    print(paste("Cluster", c))
+    train_c <- subset(train_all, Cluster == c)
+    test_c <- subset(test_all, Cluster == c)
+    
+    col_names <- colnames(train_c)[4:length(colnames(train_c))]
+    for (col in col_names){
+      print(col)
+      #print(class(lapply(train_c[col], as.numeric)))
+      #print(class(train_c$Value))
+      m <- metric_out(c,train_c$Value, train_c[[col]], test_c$Value, test_c[[col]])
+      #print(m)
+      m <- cbind(data.frame(Method = col), m)
+      metrics_all <- rbind(metrics_all, m)
+    }
+  }
+  return(metrics_all)
+}
+
+res <- metric_out_all_clusters(train_all, test_all)
+print(res)
+```
+
+```{r}
+library(ggplot2)
+
+# Assuming 'train_data' and 'test_data' are your dataframes
+combined_data <- rbind(transform(train_data, Dataset = "Train"),
+                       transform(test_data, Dataset = "Test"))
+
+# Plotting
+ggplot(combined_data, aes(x = Year, y = Value, color = Dataset)) +
+  geom_line(aes(linetype = "Actual"), linewidth = 1) +
+  geom_line(aes(y = LR, linetype = "LR"), linewidth = 1) +
+  labs(title = "Comparison of Actual and LR Predictions",
+       x = "Year",
+       y = "Value") +
+  scale_linetype_manual(name = "Dataset", values = c("Actual" = 1, "LR" = 2)) +
+  scale_color_manual(name = "Dataset", values = c("Train" = "blue", "Test" = "red"))
+
+```
+
+bnsdnlbknblanb
+
+```{r}
+# Convert Date column to a proper date format
+#subset_data$Date <- as.Date(subset_data$Date)
+
+# Get unique countries in Europe from your dataset
+european_countries <- unique(subset_data$Area)
+
+# Loop through each European country and create plots
+for (country in european_countries) {
+  # Subset the data for the current country
+  ts_data <- ts(subset_data[subset_data$Area == country, "Value"])
+
+  # Plot the autocorrelation using the acf function
+  acf(ts_data, main = paste("Autocorrelation for", country))
+
+  # Plot the time series
+  plot(ts_data, main = paste("Time Series for", country), xlab = "Date", ylab = "Demand")
+}
+
+```
+
+## Forecasting for each country separately
+
+```{r}
+
 ```
 
 ### Example analysis of one country(Austria)
@@ -209,7 +1210,7 @@ ggplot(demand_energy_Austria, aes(x = Year, y = Value)) +
 
 ```
 
-In summary, from the linear regression model we can say that there are statistically significant relationship between 'Year' and 'Value', and the linera regression model explains a substantial amount of the variability in 'Value'. We can also see that both coefficients Intercept and Year are quite important, as their p-value is very small. R-squared is 0.8394 which means that approximately 83.94% of the variability in 'Value' is explained by 'Year'. F-statistics is 109.8 and p-value is 8.499e-10 indicate that the overall model is statistically significant.
+In summary, from the linear regression model we can say that there are statistically significant relationship between 'Year' and 'Value', and the linear regression model explains a substantial amount of the variability in 'Value'. We can also see that both coefficients Intercept and Year are quite important, as their p-value is very small. R-squared is 0.8394 which means that approximately 83.94% of the variability in 'Value' is explained by 'Year'. F-statistics is 109.8 and p-value is 8.499e-10 indicate that the overall model is statistically significant.
 
 ```{r}
 tt<- 1:NROW(demand_energy_Austria)
@@ -237,25 +1238,11 @@ ggAcf(demand_energy_Austria$Year, demand_energy_Austria$Value, color = "seagreen
 ```
 
 ```{r}
-# Example data
-set.seed(42)
-df <- data.frame(x = 1:10, y = rnorm(10), group = rep(c("A", "B"), each = 5))
-
-# Create a plot with custom line colors and linetypes
-ggplot(df, aes(x, y, color = group, linetype = group)) +
-  geom_line() +
-  scale_color_manual(values = c("A" = "orange", "B" = "blue")) +
-  scale_linetype_manual(values = c("A" = "dashed", "B" = "solid"))
-
-
-```
-
-```{r}
 
 ##check the residuals? are they autocorrelated? Test of DW
 dwtest(model_slr)
 
-# Assuming 'model_slr' is your linear regression model
+# Assuming 'model_slr' is out linear regression model
 res_model_slr <- residuals(model_slr)
 
 # Create a data frame for ggplot
@@ -293,6 +1280,24 @@ fitts<- tslm(model_tslr~trend)
 summary(fitts)
 
 dwtest(fitts)
+```
+
+##### Log-transformation and Linear Regression
+
+Let's try to apply log transformation to our data and to see how it will change the result
+
+```{r}
+
+model_tslr_log <- ts(log(demand_energy_Austria$Value), frequency = 1)
+plot(model_tslr_log, type="o")
+
+## we fit a linear model with the tslm function
+fitts_log<- tslm(model_tslr_log~trend)
+
+###obviously it gives the same results of the first model
+summary(fitts_log)
+
+dwtest(fitts_log)
 ```
 
 ##### Bass Model
